@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Promoción Masiva - KORI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root { --primary: #00334e; --accent: #00a8e8; --error: #e63946; --bg: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: #1e293b; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 35px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: var(--primary); font-size: 1.6em; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; }
+        h2 { color: var(--primary); font-size: 1em; margin-top: 30px; text-transform: uppercase; background: #f1f5f9; padding: 10px; border-left: 4px solid var(--accent); }
+        h3 { color: var(--accent); font-size: 0.95em; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.85em; color: #64748b; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
+        .agencia-container { display: flex; gap: 15px; flex-wrap: wrap; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .agencia-item { display: flex; align-items: center; gap: 8px; font-size: 0.9em; cursor: pointer; }
+        .master-section { border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 30px; background: #fff; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-bottom: 15px; }
+        th { background-color: var(--primary); color: white; padding: 12px; }
+        td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .col-gris { background-color: #f1f5f9; }
+        .add-row { background: var(--accent); color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; }
+        .btn-delete { background: var(--error); color: white; border: none; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; }
+        
+        .resumen-ejecutivo { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-top: 40px; }
+        .resumen-ejecutivo ul { list-style: none; padding: 0; margin: 0; font-size: 0.9em; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        .resumen-ejecutivo li b { color: var(--primary); display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 0.8em; }
+
+        .budget-card { text-align: right; padding: 25px; background: #f0f7ff; border-radius: 0 0 10px 10px; border-top: 2px solid #e0eefc; }
+        .total-estimado-label { font-size: 1.8em; font-weight: 900; color: #00334e; letter-spacing: -0.5px; }
+        
+        #budgetAlert { color: var(--error); font-weight: bold; font-size: 0.85em; margin-top: 10px; display: none; }
+        .btn-cont { background: var(--primary); color: white; border: none; padding: 18px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1.1em; margin-top: 20px; }
+        .btn-cont:disabled { background: #cbd5e1; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <form id="formRequerimiento">
+    <h1>REQUERIMIENTO DE PROMOCIÓN MASIVA</h1>
+
+    <section>
+        <h2>1. Datos del Solicitante</h2>
+        <div class="grid">
+            <div class="field"><label>Nombre:</label><input type="text" id="sol_nombre" required></div>
+            <div class="field">
+                <label>Ciudad:</label>
+                <select id="sol_ciudad" onchange="cargarAgencias()" required>
+                    <option value="">Seleccione...</option>
+                    <option value="Arequipa">Arequipa</option>
+                    <option value="Lima">Lima</option>
+                </select>
+            </div>
+            <div class="field"><label>Fecha (Sábado):</label><input type="date" id="fechaPromo" onchange="validarFecha(this)" required></div>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Selección de Agencias</h2>
+        <div id="agenciaCheckboxes" class="agencia-container">
+            <p style="color: #94a3b8; font-size: 0.85em;">Seleccione una ciudad...</p>
+        </div>
+    </section>
+
+    <div id="dinamicoSections"></div>
+
+    <div class="resumen-ejecutivo">
+        <h3 style="margin-top:0">VISTA PREVIA DEL PEDIDO</h3>
+        <ul>
+            <li><b>Mercados:</b> <span id="res_mercados">-</span></li>
+            <li><b>Animación Totales:</b> <span id="res_animacion">0 Anim. / 0 Hrs</span></li>
+            <li><b>Artículos Totales:</b> <span id="res_articulos">0 unidades</span></li>
+        </ul>
+    </div>
+
+    <div class="budget-card">
+        <div class="total-estimado-label">TOTAL ESTIMADO: <span id="granTotal">S/ 0.00</span></div>
+        <div style="font-size: 0.9em; color: #64748b; font-weight: bold; margin-top: 5px;">Presupuesto máximo: S/1,000.00</div>
+        <div id="budgetAlert">⚠️ El monto supera el presupuesto de S/ 1,000.00</div>
+    </div>
+
+    <button type="submit" class="btn-cont" id="btnExportar">EXPORTAR REQUERIMIENTO FINAL</button>
+    </form>
+</div>
+
+<script>
+    const ciudadesConfig = {"Arequipa": ["Of principal"], "Lima": ["Carabayllo", "Los Olivos"]};
+    const catalogo = [
+        {n: "LIBRETAS KORI PUBLICITARIOS", p: 1.39, u: "Unid"},
+        {n: "LAPICERO PLASTICO PUBLICITARIO", p: 0.70, u: "Unid"},
+        {n: "LLAVEROS DESTAPADORES", p: 0.57, u: "Unid"},
+        {n: "ALCANCIA", p: 6.50, u: "Unid"},
+        {n: "MANDILES", p: 11.50, u: "Unid"},
+        {n: "BOLSAS PUBLICITARIAS TARPAULLIN", p: 14.00, u: "Unid"},
+        {n: "GLOBOS", p: 78.00, u: "Ciento"},
+        {n: "LAPICERO PUBLICITARIO DE METAL", p: 1.30, u: "Unid"},
+        {n: "LLAVERO PUBLICITARIO DE CUERINA", p: 6.50, u: "Unid"}
+    ];
+
+    document.getElementById('formRequerimiento').addEventListener('submit', function(e) {
+        e.preventDefault();
+        exportarExcelPro();
+    });
+
+    function cargarAgencias() {
+        const ciudad = document.getElementById('sol_ciudad').value;
+        const cont = document.getElementById('agenciaCheckboxes');
+        const din = document.getElementById('dinamicoSections');
+        cont.innerHTML = ""; din.innerHTML = "";
+        if (ciudad) {
+            ciudadesConfig[ciudad].forEach(ag => {
+                const div = document.createElement('div');
+                div.className = "agencia-item";
+                div.innerHTML = `<input type="checkbox" value="${ag}" onchange="toggleSeccion('${ag}', this)"> ${ag}`;
+                cont.appendChild(div);
+            });
+        }
+        calcTotal();
+    }
+
+    function toggleSeccion(nombre, cb) {
+        const id = nombre.replace(/\s/g, '');
+        if(cb.checked) {
+            const sec = document.createElement('div');
+            sec.className = "master-section";
+            sec.id = `sec-${id}`;
+            sec.innerHTML = `
+                <div style="background:var(--primary); color:white; padding:10px; font-weight:bold; border-radius:5px">AGENCIA: ${nombre}</div>
+                <h3>Artículos</h3>
+                <table>
+                    <thead><tr><th>ARTÍCULO</th><th>UNID</th><th>PRECIO</th><th>CANT.</th><th>TOTAL</th><th></th></tr></thead>
+                    <tbody id="body-${id}"></tbody>
+                </table>
+                <button type="button" class="add-row" onclick="addArticulo('${id}')">+</button>
+                <div class="grid" style="margin-top:15px">
+                    <div class="field"><label>Mercado:</label><input type="text" class="m-nombre" oninput="calcTotal()" required></div>
+                    <div class="field"><label>Maps:</label><input type="text" class="m-maps" required></div>
+                    <div class="field"><label>Dirección:</label><input type="text" class="m-dir" required></div>
+                </div>
+                <div class="grid">
+                    <div class="field"><label>N° Animadores:</label><input type="number" value="0" min="0" class="a-num" oninput="calcTotal()"></div>
+                    <div class="field"><label>Horas:</label><input type="number" value="0" min="0" class="a-hrs" oninput="calcTotal()"></div>
+                    <div class="field"><label>Adicionales (Arlequines, etc):</label><input type="text" class="a-extras" placeholder="Ej: Perifoneo, Arlequín"></div>
+                </div>
+                <div style="font-size: 0.8em; color: #64748b; font-weight: bold;">* Costo referencial animador: S/ 150.00/hr | Costo referencial reserva mercado: S/ 100.00</div>`;
+            document.getElementById('dinamicoSections').appendChild(sec);
+            addArticulo(id);
+        } else {
+            document.getElementById(`sec-${id}`).remove();
+        }
+        calcTotal();
+    }
+
+    function addArticulo(id) {
+        const tbody = document.getElementById(`body-${id}`);
+        const rid = Date.now() + Math.random();
+        const tr = document.createElement('tr');
+        tr.id = `r-${rid}`;
+        tr.innerHTML = `
+            <td><select onchange="updRow('${rid}',this)" required><option value="">Elegir...</option>${catalogo.map(x=>`<option value="${x.n}">${x.n}</option>`).join('')}</select></td>
+            <td class="col-gris u">-</td><td class="col-gris p" data-v="0">S/ 0.00</td>
+            <td><input type="number" min="1" class="c" oninput="calcTotal()" disabled></td>
+            <td class="col-gris t">S/ 0.00</td>
+            <td><button type="button" class="btn-delete" onclick="document.getElementById('r-${rid}').remove();calcTotal()">✖</button></td>`;
+        tbody.appendChild(tr);
+    }
+
+    function updRow(rid, sel) {
+        const row = document.getElementById(`r-${rid}`);
+        const qtyInput = row.querySelector('.c');
+        const itm = catalogo.find(x => x.n === sel.value);
+        if(itm) {
+            row.querySelector('.u').innerText = itm.u;
+            row.querySelector('.p').innerText = `S/ ${itm.p.toFixed(2)}`;
+            row.querySelector('.p').dataset.v = itm.p;
+            qtyInput.disabled = false; qtyInput.required = true;
+        }
+        calcTotal();
+    }
+
+    function calcTotal() {
+        let granTotal = 0;
+        let listaMercados = [];
+        let totalUnidadesMerch = 0;
+        let animadores = 0, horas = 0;
+
+        document.querySelectorAll('tbody tr').forEach(row => {
+            const p = parseFloat(row.querySelector('.p').dataset.v) || 0;
+            const c = parseFloat(row.querySelector('.c').value) || 0;
+            row.querySelector('.t').innerText = `S/ ${(p * c).toFixed(2)}`;
+            granTotal += (p * c);
+            totalUnidadesMerch += c;
+        });
+
+        document.querySelectorAll('.master-section').forEach(sec => {
+            const n = parseInt(sec.querySelector('.a-num').value) || 0;
+            const h = parseFloat(sec.querySelector('.a-hrs').value) || 0;
+            const subAnim = n * h * 150; 
+            const costoReserva = 100; 
+            
+            granTotal += subAnim + costoReserva;
+            animadores += n; horas += h;
+            
+            const m = sec.querySelector('.m-nombre').value;
+            if(m) listaMercados.push(m);
+        });
+
+        document.getElementById('granTotal').innerText = `S/ ${granTotal.toFixed(2)}`;
+        document.getElementById('res_mercados').innerText = listaMercados.join(", ") || "-";
+        document.getElementById('res_animacion').innerText = `${animadores} Anim. / ${horas} Hrs`;
+        document.getElementById('res_articulos').innerText = `${totalUnidadesMerch} unidades`;
+        
+        document.getElementById('btnExportar').disabled = (granTotal > 1000);
+        document.getElementById('budgetAlert').style.display = (granTotal > 1000 ? 'block' : 'none');
+    }
+
+    function validarFecha(input) {
+        const f = new Date(input.value + "T00:00:00");
+        const hoy = new Date();
+        if ((f - hoy) / (1000*60*60*24) < 23 || f.getDay() !== 6) { 
+            alert("Mínimo 1 mes de antelación y debe ser Sábado."); 
+            input.value = ""; 
+        }
+    }
+
+    function exportarExcelPro() {
+        const wb = XLSX.utils.book_new();
+        const sol = document.getElementById('sol_nombre').value;
+        const ciu = document.getElementById('sol_ciudad').value;
+        const fec = document.getElementById('fechaPromo').value;
+
+        let resumenAOA = [
+            ["REQUERIMIENTO DE PROMOCIÓN MASIVA - KORI"],
+            [""],
+            ["DATOS GENERALES"],
+            ["SOLICITANTE:", sol, "", "CIUDAD:", ciu],
+            ["FECHA:", fec, "", "COSTOS REF.:", "Animación S/150 - Reserva S/100"],
+            [""],
+            ["DETALLE POR PUNTO DE PROMOCIÓN (COSTOS REFERENCIALES)"]
+        ];
+
+        let pbiAOA = [[
+            "Solicitante", "Ciudad", "Fecha", "Agencia", "Mercado", "Link Maps", 
+            "Direccion", "Animadores", "Horas", "Costo Ref Animacion", "Costo Ref Reserva", "Adicionales",
+            "Articulo", "Unidad", "Cantidad", "Precio Unit", "Subtotal Merch"
+        ]];
+
+        document.querySelectorAll('.master-section').forEach(sec => {
+            const ag = sec.querySelector('div').innerText.replace("AGENCIA: ", "");
+            const mN = sec.querySelector('.m-nombre').value;
+            const mL = sec.querySelector('.m-maps').value;
+            const mD = sec.querySelector('.m-dir').value;
+            const aN = sec.querySelector('.a-num').value;
+            const aH = sec.querySelector('.a-hrs').value;
+            const aE = sec.querySelector('.a-extras').value || "Ninguno";
+            const aC = aN * aH * 150;
+            const cR = 100; 
+
+            resumenAOA.push(["AGENCIA:", ag]);
+            resumenAOA.push(["Mercado:", mN, "Costo Ref. Reserva:", "S/ 100.00"]);
+            resumenAOA.push(["Dirección:", mD, "Maps:", mL]);
+            resumenAOA.push(["Animación:", `${aN} pers. / ${aH} hrs`, "Costo Ref. Anim:", `S/ ${aC.toFixed(2)}`]);
+            resumenAOA.push(["Adicionales:", aE]);
+            resumenAOA.push(["ARTÍCULO", "CANTIDAD", "UNIDAD", "SUBTOTAL"]);
+
+            sec.querySelectorAll('tbody tr').forEach(row => {
+                const art = row.querySelector('select').value;
+                const can = row.querySelector('.c').value;
+                const uni = row.querySelector('.u').innerText;
+                const pre = parseFloat(row.querySelector('.p').dataset.v);
+                
+                if(art && can > 0) {
+                    const subM = can * pre;
+                    resumenAOA.push([art, can, uni, `S/ ${subM.toFixed(2)}`]);
+                    pbiAOA.push([sol, ciu, fec, ag, mN, mL, mD, aN, aH, aC, cR, aE, art, uni, can, pre, subM]);
+                }
+            });
+            resumenAOA.push([""]); 
+        });
+
+        resumenAOA.push(["TOTAL ESTIMADO (REFERENCIAL):", "", "", document.getElementById('granTotal').innerText]);
+
+        const wsResumen = XLSX.utils.aoa_to_sheet(resumenAOA);
+        const wsPBI = XLSX.utils.aoa_to_sheet(pbiAOA);
+        wsResumen['!cols'] = [{wch: 25}, {wch: 25}, {wch: 15}, {wch: 15}];
+
+        XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen_Pedido");
+        XLSX.utils.book_append_sheet(wb, wsPBI, "Data_PowerBI");
+
+        XLSX.writeFile(wb, `KORI_REQUERIMIENTO_${sol.replace(/\s/g, '_')}.xlsx`);
+    }
+</script>
+</body>
+</html>
