@@ -55,7 +55,7 @@
                     <option value="Lima">Lima</option>
                 </select>
             </div>
-            <div class="field"><label>Fecha (Sábado):</label><input type="date" id="fechaPromo" onchange="validarFecha(this)" required></div>
+            <div class="field"><label>Fecha:</label><input type="date" id="fechaPromo" onchange="validarFecha(this)" required></div>
         </div>
     </section>
 
@@ -219,12 +219,8 @@
     }
 
     function validarFecha(input) {
-        const f = new Date(input.value + "T00:00:00");
-        const hoy = new Date();
-        if ((f - hoy) / (1000*60*60*24) < 23 || f.getDay() !== 6) { 
-            alert("Mínimo 1 mes de antelación y debe ser Sábado."); 
-            input.value = ""; 
-        }
+        // Se removieron las validaciones de sábado y mes de anticipación.
+        // La fecha seleccionada se acepta libremente.
     }
 
     function exportarExcelPro() {
